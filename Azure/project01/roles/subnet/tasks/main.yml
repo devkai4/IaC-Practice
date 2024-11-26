@@ -1,0 +1,23 @@
+- name: Add subnet 1
+  azure_rm_subnet:
+    resource_group: "{{ myResourceGroup }}"
+    name: "{{ mySubnet1 }}"
+    address_prefix: "{{ subnetpref1 }}"
+    virtual_network: "{{ myVnet }}"
+  register: subnet1
+
+- name: output
+  debug:
+    msg: "{{ subnet1.state.name }} {{ subnet1.state.address_prefix }}"
+
+- name: Add subnet 2
+  azure_rm_subnet:
+    resource_group: "{{ myResourceGroup }}"
+    name: "{{ mySubnet2 }}"
+    address_prefix: "{{ subnetpref2 }}"
+    virtual_network: "{{ myVnet }}"
+  register: subnet2
+
+- name: output
+  debug:
+    msg: "{{ subnet2.state.name }} {{ subnet2.state.address_prefix }}"

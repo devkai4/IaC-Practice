@@ -1,0 +1,30 @@
+  - name: RAW Disk イニシャライズ
+    win_initialize_disk:
+      disk_number: 2
+ 
+  - name: Disk Mount F Drive
+    win_partition:
+      drive_letter: F
+      partition_size: -1
+      disk_number: 2
+ 
+  - name: Disk Format
+    win_format:
+      drive_letter: F
+      file_system: "ntfs"
+ 
+  - name: DC昇格処理
+    microsoft.ad.domain:
+      create_dns_delegation: false
+      database_path: F:\NTDS
+      dns_domain_name: ohayou.com
+      domain_mode: WinThreshold
+      domain_netbios_name: OHAYOU
+      forest_mode: WinThreshold
+      safe_mode_password: "#Password01!"
+      sysvol_path: F:\SYSVOL
+    register: domain_install
+ 
+  - name: DC昇格後の再起動
+    ansible.windows.win_reboot:
+    when: domain_install.reboot_required

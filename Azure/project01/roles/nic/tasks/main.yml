@@ -1,0 +1,39 @@
+  - name: Create virtual network interface card With publicIP
+    azure_rm_networkinterface:
+      resource_group: "{{ myResourceGroup }}"
+      name: "{{ myVM }}-NIC"
+      virtual_network: "{{ myVnet }}"
+      subnet: "{{ mySubnet }}"
+      security_group: "{{ pub_nsg }}"
+      ip_configurations:
+        - name: ipconfig1
+          public_ip_name: "{{ myVM }}-publicIP"
+          primary: True
+    when: public_ip is defined
+ 
+  - name: Create virtual network interface card Without publicIP
+    azure_rm_networkinterface:
+      resource_group: "{{ myResourceGroup }}"
+      name: "{{ myVM }}-NIC"
+      virtual_network: "{{ myVnet }}"
+      subnet: "{{ mySubnet }}"
+      security_group: "{{ myVM }}-SecurityGroup"
+      ip_configurations:
+        - name: ipconfig1
+          primary: True
+    register: local_ip_address
+    when: public_ip is not defined
+ 
+  - name: output file
+    local_action: copy content={{ local_ip_address.state.ip_configuration.private_ip_address }} dest={{ myVM }}.dat
+    when: public_ip is not defined
+ 
+  - name: local IP of VM
+    debug:
+      msg: "The local IP is {{ local_ip_address.state.ip_configuration.private_ip_address }}."
+    when: public_ip is not defined
+      
+  # - name: Local IP of VM set env
+  # set_fact:
+  # local_ip: "{{ local_ip_address.state.ip_configuration.private_ip_address }}"
+  # when: public_ip is not defined

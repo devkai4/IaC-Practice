@@ -1,0 +1,25 @@
+---
+# ↓必ず利用者の名前.苗字をローマ字で↓
+var_your_name: zhengkai.wang
+
+myResourceGroup: "{{ var_your_name }}_MK_TEMP"
+area: japaneast
+myVnet: MK_TEMP_VNET
+vnetpref: 10.155.0.0/24
+mySubnet1: TEMP_Subnet
+subnetpref1: 10.155.0.0/25
+
+myVM: TEMP-WIN2022
+mySubnet: "{{ mySubnet1 }}"
+adminuser_name: azureadmin
+admin_password: "#Password01!"
+public_ip: yes
+pub_nsg: "{{ myVM }}_NSG"
+
+var_os_type: windows #Windowsデプロイ時必須変数
+var_vm_size: Standard_B2s
+var_offer: WindowsServer
+var_publisher: MicrosoftWindowsServer
+var_sku: 2022-datacenter-azure-edition
+var_version: latest
+var_winrmport: 5986

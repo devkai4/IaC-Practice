@@ -1,0 +1,9 @@
+  - name: Create Network Security Group "{{ myVM }}-SecurityGroup"
+    azure_rm_securitygroup:
+      resource_group: "{{ myResourceGroup }}"
+      name: "{{ myVM }}-SecurityGroup"
+      # rules:
+    register: nsg
+  - name: output
+    debug:
+      msg: "{{ nsg.state.rules }}"

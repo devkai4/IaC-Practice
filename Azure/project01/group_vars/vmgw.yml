@@ -1,0 +1,4 @@
+---
+mySubnet: "{{ mySubnet1 }}"
+myVM: VMGW
+public_ip: yes

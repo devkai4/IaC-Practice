@@ -1,0 +1,10 @@
+- name: Create virtual network
+  azure_rm_virtualnetwork:
+    resource_group: "{{ myResourceGroup }}"
+    name: "{{ myVnet }}"
+    address_prefixes: "{{ vnetpref }}"
+  register: vnet_detail
+
+- name: output
+  debug:
+    msg: "{{ vnet_detail.state.name }} {{ vnet_detail.state.address_prefixes }}"

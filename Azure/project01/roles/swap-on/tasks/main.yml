@@ -1,0 +1,16 @@
+  - name: /etc/waagent.conf SWAP ON
+    replace:
+      dest: /etc/waagent.conf
+      regexp: '{{ item.regexp }}'
+      replace: '{{ item.replace }}'
+    with_items:
+        - regexp: ResourceDisk.Format=n
+          replace: ResourceDisk.Format=y
+        - regexp: ResourceDisk.EnableSwap=n
+          replace: ResourceDisk.EnableSwap=y
+        - regexp: ResourceDisk.SwapSizeMB=0
+          replace: ResourceDisk.SwapSizeMB=2048
+    register: config_data
+ 
+  - when: config_data.changed
+    reboot:

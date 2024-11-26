@@ -1,0 +1,59 @@
+---
+- hosts: vmgw
+  remote_user: azureuser
+  become: yes
+  tasks:
+  roles:
+    - squid_install
+  tags: squid
+
+- hosts: linux
+  vars_files: inventory/proxy.yml
+  remote_user: azureuser
+  become: yes
+  tasks:
+  roles:
+    - swap-on
+    - groupware
+  tags: groupware
+
+- hosts: windows
+  gather_facts: no
+  vars_files: inventory/proxy.yml
+  tasks:
+  roles:
+    - winhosts_config
+  tags: winhosts
+
+- hosts: vmgw
+  remote_user: azureuser
+  become: yes
+  tasks:
+  roles:
+    - inst_docker
+    - inst_guacamole
+  tags: inst_docker
+
+- hosts: windows
+  gather_facts: no
+  vars_files: inventory/proxy.yml
+  tasks:
+  roles:
+    - local_jp
+  tags: local_jp
+
+- hosts: windows[0]
+  gather_facts: no
+  vars_files: inventory/proxy.yml
+  tasks:
+  roles:
+    - dcprep
+  tags: dcprep
+
+- hosts: vmgw
+  remote_user: azureuser
+  become: yes
+  tasks:
+  roles:
+    - squid_stop
+  tags: squid_stop

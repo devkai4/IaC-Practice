@@ -1,0 +1,26 @@
+---
+- hosts: localhost
+  gather_facts: no
+  tasks:
+ 
+  - name: run shell
+    shell: |
+      az vm list --query "[].[name, resourceGroup]" --output tsv | while read line
+      do
+        set -- $line
+        vmname=$1
+        rgname=$2
+        vmstatus=`az vm get-instance-view -g $rgname -n $vmname --query instanceView.statuses[1].displayStatus --output tsv`
+        if [ "$vmstatus" = "VM deallocated" ]
+        then
+            echo $vmname "is starting"
+            az vm start -n $vmname -g $rgname &
+        else
+            echo $vmname $vmstatus
+        fi
+      done
+      wait
+    register: shell_output
+ 
+  - name: debug
+    debug: {var: shell_output.stdout_lines}

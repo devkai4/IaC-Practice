@@ -1,0 +1,3 @@
+---
+mySubnet: "{{ mySubnet2 }}"
+myVM: Ubuntu1

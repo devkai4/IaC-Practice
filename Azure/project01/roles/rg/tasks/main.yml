@@ -1,0 +1,10 @@
+- name: Create resource group
+  azure_rm_resourcegroup:
+    name: "{{ myResourceGroup }}"
+    location: "{{ area }}"
+    # state: absent
+  register: rg_detail
+
+- name: output
+  debug:
+    msg: "{{ rg_detail.state.id }}"

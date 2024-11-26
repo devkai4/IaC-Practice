@@ -1,0 +1,2 @@
+ansible_winrm_proxy: "http://AABBCC"
+ansible_ssh_common_args: '-o ProxyCommand="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -i ./spec-key -W %h:%p -q azureuser@ZZXXRR"'

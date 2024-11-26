@@ -1,0 +1,5 @@
+---
+mySubnet: "{{ mySubnet2 }}" 
+myVM: WIN1
+adminuser_name: azureadmin
+admin_password: "#Password01!"

@@ -1,0 +1,117 @@
+    - name: Set timezone to Asia/Tokyo
+      community.general.timezone:
+        name: Asia/Tokyo
+      become: true
+ 
+    - name: グループウェア用ディレクトリ作成
+      file:
+        path: "/usr/local/java"
+        state: directory
+        owner: "root"
+        group: "root"
+        mode: "755"
+ 
+    - name: Tomcatサービス用アカウント作成
+      user:
+        name: tomcat
+        comment: Apache Tomcat
+        uid: 998
+        shell: /usr/sbin/nologin
+        createhome: no
+ 
+    - name: JAVA JDKダウンロード
+      get_url:
+        dest: /usr/local/java
+        url: https://spec00staticweb.blob.core.windows.net/iso/groupware-linux/OpenJDK21U-jdk_x64_linux_21.0.3_9.tar.gz
+        mode: 0644
+        owner: root
+        group: root
+      become: yes
+ 
+    - name: TOMCATダウンロード
+      get_url:
+        dest: /usr/local/java
+        url: https://spec00staticweb.blob.core.windows.net/iso/groupware-linux/apache-tomcat-9.0.89.tar.gz
+        mode: 0644
+        owner: root
+        group: root
+      become: yes
+ 
+    - name: TAR-JDK解凍
+      unarchive:
+        src: /usr/local/java/OpenJDK21U-jdk_x64_linux_21.0.3_9.tar.gz
+        dest: /usr/local/java
+        remote_src: yes
+      become: yes
+ 
+    - name: TAR-TOMCAT解凍
+      unarchive:
+        src: /usr/local/java/apache-tomcat-9.0.89.tar.gz
+        dest: /usr/local/java
+        remote_src: yes
+      become: yes
+ 
+    - name: Gsessionダウンロード
+      get_url:
+        dest: /usr/local/java/apache-tomcat-9.0.89/webapps/
+        url: https://spec00staticweb.blob.core.windows.net/iso/groupware-linux/gsession.war
+        mode: 0644
+        owner: tomcat
+        group: tomcat
+      become: yes
+ 
+    - name: Change Owner
+      file:
+        path: /usr/local/java/apache-tomcat-9.0.89/
+        recurse: true
+        owner: tomcat
+        group: tomcat
+ 
+    - name: 環境変数追加
+      shell: |
+        echo "JAVA_HOME=/usr/local/java/jdk-21.0.3+9" >> /home/azureuser/.bash_profile
+        echo "PATH=\$JAVA_HOME/bin:\$PATH" >> /home/azureuser/.bash_profile
+        echo "export PATH" >> /home/azureuser/.bash_profile
+        echo "CATALINA_HOME=/usr/local/java/apache-tomcat-9.0.89" >> /home/azureuser/.bash_profile
+        echo "PATH=\$CATALINA_HOME/bin:\$PATH" >> /home/azureuser/.bash_profile
+        echo "export PATH" >> /home/azureuser/.bash_profile
+ 
+    - name: setenv.shファイル生成
+      shell: |
+        sudo tee /usr/local/java/apache-tomcat-9.0.89/bin/setenv.sh <<EOF
+        export CATALINA_HOME=/usr/local/java/apache-tomcat-9.0.89
+        export JAVA_HOME=/usr/local/java/jdk-21.0.3+9
+        EOF
+ 
+    - name: sytemdユニットファイル生成
+      shell: |
+        sudo tee /etc/systemd/system/tomcat9.service <<EOF
+        [Unit]
+        Description=Apache Tomcat 9.0.89
+        ConditionPathExists=/usr/local/java/apache-tomcat-9.0.89
+ 
+        [Service]
+        User=tomcat
+        Group=tomcat
+        Type=oneshot
+ 
+        ExecStart=/usr/local/java/apache-tomcat-9.0.89/bin/startup.sh
+        ExecStop=/usr/local/java/apache-tomcat-9.0.89/bin/shutdown.sh
+        Restart=no
+        RemainAfterExit=yes
+ 
+        [Install]
+        WantedBy=multi-user.target
+        EOF
+ 
+    - name: Change Mode Systemd Tomcat
+      file:
+        path: /etc/systemd/system/tomcat9.service
+        mode: '0755'
+ 
+    - name: Tomcat9 Enable and Start
+      ansible.builtin.systemd_service:
+        state: started
+        name: tomcat9
+        enabled: true
+        daemon_reload: true

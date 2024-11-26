@@ -1,0 +1,16 @@
+[vmgw]
+VMGW_PUBIP
+
+[windows]
+WIN1
+WIN2
+
+[windows:vars]
+ansible_user=azureadmin
+ansible_password="#Password01!"
+ansible_connection=winrm
+ansible_port=5986
+ansible_winrm_server_cert_validation=ignore
+
+[linux]
+LNX1

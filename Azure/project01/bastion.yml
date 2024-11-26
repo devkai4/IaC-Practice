@@ -1,0 +1,89 @@
+- hosts: localhost
+  gather_facts: no
+  tasks:
+ 
+  - name: Add AzureBastionSubnet
+    azure_rm_subnet:
+      resource_group: "{{ myResourceGroup }}"
+      name: "{{ var_bastion_subnet }}"
+      address_prefix: "{{ var_bastion_pref }}"
+      virtual_network: "{{ myVnet }}"
+    register: bastion_state
+ 
+  - name: output bastion state
+    debug:
+      msg: "{{ bastion_state.state.id }}"
+ 
+  - name: Create public IP address For Bastion
+    azure_rm_publicipaddress:
+      resource_group: "{{ myResourceGroup }}"
+      allocation_method: Static
+      name: "{{ var_bastion_name }}-publicIP"
+      sku: standard
+    register: bastion_ip
+ 
+  - name: Public IP of Bastion
+    debug:
+      msg: "The public IP is {{ bastion_ip.state.ip_address }}."
+ 
+  - name: Get facts for PublicIP
+    azure_rm_publicipaddress_info:
+      resource_group: "{{ myResourceGroup }}"
+      name: "{{ var_bastion_name }}-publicIP"
+    register: pubip_detail
+ 
+  - name: output pubip state
+    debug:
+      msg: "{{ pubip_detail.publicipaddresses[0].id }}"
+ 
+  - name: Create bastion host
+    azure.azcollection.azure_rm_bastionhost:
+      name: "{{ var_bastion_name }}"
+      resource_group: "{{ myResourceGroup }}"
+      ip_configurations:
+        - name: bastion_ip_configuration
+          subnet:
+            id: "{{ bastion_state.state.id }}"
+          public_ip_address:
+            id: "{{ pubip_detail.publicipaddresses[0].id }}"
+          private_ip_allocation_method: Dynamic
+      sku:
+        name: Basic
+      # enable_tunneling: false
+      # enable_shareable_link: false
+      # enable_ip_connect: true
+      # enable_file_copy: false
+      # scale_units: 2
+      # disable_copy_paste: false
+      tags:
+        key1: bastion
+ 
+  - name: Show bastion host info
+    azure.azcollection.azure_rm_bastionhost_info:
+      name: "{{ var_bastion_name }}"
+      resource_group: "{{ myResourceGroup }}"
+    register: bastion_info
+ 
+  - name: Output Bastion Info
+    debug:
+      msg: "{{ bastion_info }}"
+ 
+# Delete Bastion and publicIP
+  - name: Delete bastion host
+    azure.azcollection.azure_rm_bastionhost:
+      name: "{{ var_bastion_name }}"
+      resource_group: "{{ myResourceGroup }}"
+      state: absent
+    tags:
+      - never
+      - delete
+ 
+  - name: Delete public IP address For Bastion
+    azure_rm_publicipaddress:
+      resource_group: "{{ myResourceGroup }}"
+      name: "{{ var_bastion_name }}-publicIP"
+      state: absent
+    register: bastion_ip
+    tags:
+      - never
+      - delete-ip

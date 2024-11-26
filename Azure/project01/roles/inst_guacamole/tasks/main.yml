@@ -1,0 +1,14 @@
+    - name: git clone
+      ansible.builtin.git:
+        repo: https://github.com/yuichi109/guacamole-docker-compose.git
+        dest: /home/azureuser/guacamole-docker-compose
+ 
+    - name: Gnenerate DB
+      shell: |
+        cd guacamole-docker-compose
+        ./prepare.sh
+ 
+    - name: コンテナ起動(docker-compose Guacamole)
+      community.docker.docker_compose_v2:
+        project_src: /home/azureuser/guacamole-docker-compose/
+        state: present

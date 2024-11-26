@@ -1,0 +1,317 @@
+---
+- hosts: localhost
+  connection: local
+  gather_facts: no
+  tasks:
+
+# # ---------------------------------------------------------------------------------
+# # 既存イメージ確認
+#   - name: List all available images under "{{ myResourceGroup }}"
+#     azure_rm_image_info:
+#       resource_group: "{{ myResourceGroup }}"
+#       #resource_group: TEST
+#       name: "{{ myVM }}-TEMPLATE"
+#     register: image_info
+#     failed_when: no
+
+#   - name: 既存イメージのチェック
+#     debug:
+#       msg: "新規イメージ用のOSをデプロイします"
+#     when:
+#       - >-
+#         image_info | regex_search("ResourceNotFound", multiline=true)
+
+#   - name: set_fact1
+#     set_fact:
+#       img_info: "{{ image_info.images[0].id }}"
+#     when:
+#       - >-
+#         not image_info | regex_search("ResourceNotFound", multiline=true)
+
+#   - name: An existing image exists
+#     fail:
+#       msg: "既にイメージが存在するので処理を強制終了します"
+#     when: img_info is defined
+# # ---------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------
+# Deploy Infra
+# Resource Group
+  - name: Create resource group
+    azure_rm_resourcegroup:
+      name: "{{ myResourceGroup }}"
+      location: "{{ area }}"
+    register: rg_detail
+
+  - name: output
+    debug:
+      msg: "{{ rg_detail.state.id }}"
+
+# ---------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------
+# VNET
+  - name: Create virtual network
+    azure_rm_virtualnetwork:
+      resource_group: "{{ myResourceGroup }}"
+      name: "{{ myVnet }}"
+      address_prefixes: "{{ vnetpref }}"
+    register: vnet_detail
+
+  - name: output
+    debug:
+      msg: "{{ vnet_detail.state.name }} {{ vnet_detail.state.address_prefixes }}"
+
+  - name: Add subnet 1
+    azure_rm_subnet:
+      resource_group: "{{ myResourceGroup }}"
+      name: "{{ mySubnet1 }}"
+      address_prefix: "{{ subnetpref1 }}"
+      virtual_network: "{{ myVnet }}"
+    register: subnet1
+
+  - name: output
+    debug:
+      msg: "{{ subnet1.state.name,subnet1.state.address_prefix }}"
+# ---------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------
+# NSG
+  - name: Create Network Security Group that allows WinRM
+    azure_rm_securitygroup:
+      resource_group: "{{ myResourceGroup }}"
+      name: "{{ pub_nsg }}"
+      purge_rules: true
+      rules:
+        - name: WinRM1
+          protocol: Tcp
+          destination_port_range: "{{ var_winrmport }}"
+          access: Allow
+          priority: 1001
+          direction: Inbound
+          source_address_prefix: "125.103.199.64/28"
+        - name: WinRM2
+          protocol: Tcp
+          destination_port_range: "{{ var_winrmport }}"
+          access: Allow
+          priority: 1011
+          direction: Inbound
+          source_address_prefix: "113.43.251.248/29"
+        - name: WinRM3
+          protocol: Tcp
+          destination_port_range: "{{ var_winrmport }}"
+          access: Allow
+          priority: 1021
+          direction: Inbound
+          source_address_prefix: "40.81.207.113/32"
+
+    register: nsg1
+  - name: output
+    debug:
+      msg: "{{ nsg1.state.name,nsg1.state.rules }}"
+# ---------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------
+# PublicIP
+  - name: Create public IP address
+    azure_rm_publicipaddress:
+      resource_group: "{{ myResourceGroup }}"
+      allocation_method: Static
+      name: "{{ myVM }}-publicIP"
+    register: output_ip_address
+
+  - name: Public IP of VM
+    debug:
+      msg: "The public IP is {{ output_ip_address.state.ip_address }}."
+
+  - name: Public IP of VM set env
+    set_fact:
+      publicip: "{{ output_ip_address.state.ip_address }}"
+
+  - name: output file
+    local_action: copy content={{ output_ip_address.state.ip_address }} dest={{ myVM }}.dat
+    when: public_ip is defined
+
+  - name: set new host
+    add_host:
+      name: "{{ output_ip_address.state.ip_address }}"
+      group: new_host
+# ---------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------
+# NIC
+  - name: Create virtual network interface card With publicIP
+    azure_rm_networkinterface:
+      resource_group: "{{ myResourceGroup }}"
+      name: "{{ myVM }}-NIC"
+      virtual_network: "{{ myVnet }}"
+      subnet: "{{ mySubnet }}"
+      security_group: "{{ pub_nsg }}"
+      ip_configurations:
+        - name: ipconfig1
+          public_ip_name: "{{ myVM }}-publicIP"
+          primary: True
+    when: public_ip is defined
+# ---------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------
+# For Windows Deploy
+  - name: Create VM(Windows) "{{ myVM }}"
+    azure_rm_virtualmachine:
+      resource_group: "{{ myResourceGroup }}"
+      name: "{{ myVM }}"
+      vm_size: "{{ var_vm_size }}"
+      admin_username: "{{ adminuser_name }}"
+      admin_password: "{{ admin_password }}"
+      network_interfaces: "{{ myVM }}-NIC"
+      boot_diagnostics:
+        enabled: yes
+        type: managed
+      os_type: Windows
+      started: true
+      #restarted: true
+      #started: false
+      #allocated: false
+      image:
+          offer: "{{ var_offer }}"
+          publisher: "{{ var_publisher }}"
+          sku: "{{ var_sku }}"
+          version: "{{ var_version }}"
+      managed_disk_type: StandardSSD_LRS #OS Disk
+      os_disk_caching: ReadWrite
+    when: var_os_type is defined
+
+  - name: Create VM script extension to enable HTTPS WinRM listener
+    azure_rm_virtualmachineextension:
+      name: winrm-extension
+      resource_group: "{{ myResourceGroup }}"
+      virtual_machine_name: "{{ myVM }}"
+      publisher: Microsoft.Compute
+      virtual_machine_extension_type: CustomScriptExtension
+      type_handler_version: '1.9'
+      settings: '{"fileUris": ["https://raw.githubusercontent.com/yuichi109/ps1/main/ConfigureRemotingForAnsible.ps1"],"commandToExecute": "powershell -ExecutionPolicy Unrestricted -File ConfigureRemotingForAnsible.ps1"}'
+      auto_upgrade_minor_version: true
+    when: var_os_type is defined
+# ---------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------
+# ---------------------------------------------------------------------------------
+# Windows Server
+- hosts: new_host
+  gather_facts: no
+  vars:
+    ansible_user: azureadmin
+    ansible_password: "#Password01!"
+    ansible_connection: winrm
+    ansible_port: 5986
+    ansible_winrm_server_cert_validation: ignore
+
+  tasks:
+    - name: ローカライズ処理冪等性チェック(実行済み確認)
+      win_stat:
+        path: c:\temp\win2022jp.ps1
+      register: file_info
+    #ここでチェックしたファイルがなければ(== false)コマンドを実行しない
+    
+    - name: 日本語化スクリプト 転送
+      copy:
+        src: inventory/win2022jp.ps1
+        dest: C:\temp
+      when: file_info.stat.exists == false
+
+    - name: 日本語化スクリプト 同期実行なので10分程度かかります
+      win_command: powershell.exe c:\temp\win2022jp.ps1
+      # async: 45
+      # poll: 0
+      when: file_info.stat.exists == false
+
+    - name: Reboot待機中
+      wait_for_connection:
+        delay: 150
+        timeout: 300
+      when: file_info.stat.exists == false
+
+    - name: Sysprep メッセージ表示
+      debug:
+        msg: "この後Sysprep実行中にエラーとなりますがそのまま待機してください"
+
+    - name: "Sysprep VM"
+      win_command: C:\Windows\System32\Sysprep\Sysprep.exe /generalize /oobe /quiet /mode:vm /quit
+      ignore_errors: True
+      # when: file_info.stat.exists == false
+
+    - name: "Sysprep Wait Time"
+      pause:
+        minutes: 3
+      # when: file_info.stat.exists == false
+# ---------------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------------
+# Azure
+- hosts: localhost
+  connection: local
+  gather_facts: no
+  tasks:
+
+    - name: Generalize VM
+      azure_rm_virtualmachine:
+        resource_group: "{{ myResourceGroup }}"
+        name: "{{ myVM }}"
+        generalized: yes
+
+    - name: "Check if VM is generalized"
+      delegate_to: localhost
+      azure_rm_virtualmachine_info:
+          resource_group: "{{ myResourceGroup }}"
+          name: "{{ myVM }}"
+      register: generalized_output
+
+    - assert:
+        that: generalized_output.vms[0].power_state == 'generalized'
+
+    - name: Create custom image
+      azure_rm_image:
+        resource_group: "{{ myResourceGroup }}"
+        name: "{{ myVM }}-TEMPLATE"
+        source: "{{ myVM }}"
+
+    # - name: VM deallocate
+    #   azure_rm_virtualmachine:
+    #     resource_group: "{{ myResourceGroup }}"
+    #     name: "{{ myVM }}"
+    #     allocated: false
+
+    - name: Delete VM "{{ myVM }}"
+      azure_rm_virtualmachine:
+        resource_group: "{{ myResourceGroup }}"
+        name: "{{ myVM }}"
+        state: absent
+  
+    - name: Delete Network Security Group "{{ pub_nsg }}"
+      azure_rm_securitygroup:
+        resource_group: "{{ myResourceGroup }}"
+        name: "{{ pub_nsg }}"
+        state: absent
+
+    - name: Delete virtual network
+      azure_rm_virtualnetwork:
+        resource_group: "{{ myResourceGroup }}"
+        name: "{{ myVnet }}"
+        state: absent
+
+    - name: List all available images under "{{ myResourceGroup }}"
+      azure_rm_image_info:
+        resource_group: "{{ myResourceGroup }}"
+      register: image_info
+
+    - name: output
+      debug:
+        msg: "{{ image_info.images[0].id }}"
+
+    - name: output os image datfile
+      local_action: copy content={{ image_info.images[0].id }} dest={{ myVM }}_image_list.yml
+
+    - name: Delete "{{ myVM }}.dat"
+      file:
+        path: "{{ myVM }}.dat"
+        state: absent

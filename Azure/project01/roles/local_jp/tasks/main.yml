@@ -1,0 +1,29 @@
+- name: ローカライズ処理冪等性チェック(実行済み確認)
+  win_stat:
+    path: c:\temp\win2022jp.ps1
+  register: file_info
+# ここでチェックしたファイルがなければ(== false)コマンドを実行しない
+ 
+- name: 日本語化スクリプト 転送
+  copy:
+    src: inventory/win2022jp.ps1
+    dest: C:\temp
+  when: file_info.stat.exists == false
+ 
+- name: 日本語化スクリプト 非同期実行
+  win_command: powershell.exe c:\temp\win2022jp.ps1
+  async: 45
+  poll: 0
+  when: file_info.stat.exists == false
+
+- name: 日本語化スクリプト 同期実行なので10分程度かかります
+  win_command: powershell.exe c:\temp\win2022jp.ps1
+  # async: 45
+  # poll: 0
+  when: file_info.stat.exists == false
+
+- name: Reboot待機中
+  wait_for_connection:
+    delay: 150
+    timeout: 300
+  when: file_info.stat.exists == false

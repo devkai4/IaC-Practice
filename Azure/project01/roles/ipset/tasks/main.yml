@@ -1,0 +1,169 @@
+- name: 冪等性維持-hosts削除
+  file:
+    path: inventory/hosts
+    state: absent
+
+- name: 冪等性維持-hostsコピー
+  copy:
+    src: inventory/def-hosts
+    dest: inventory/hosts
+
+- name: 取得したパブリックIPをhostsへ書き込み
+  replace:
+    dest: inventory/hosts
+    regexp: VMGW_PUBIP
+    replace: "{{ publicip }}"
+    backup: no
+
+- name: datファイルカウント処理
+  shell: ls WIN*.dat |wc -l
+  register: return_from_shell
+
+- name: Local IPをhostsへ書き込み
+  replace:
+    dest: inventory/hosts
+    regexp: WIN{{ item }}
+    replace: "{{ lookup('file', 'WIN{{ item }}.dat') }}"
+    backup: no
+  with_sequence: start=1 end="{{ return_from_shell.stdout }}"
+
+- name: idem del proxy.yml
+  file:
+    path: inventory/proxy.yml
+    state: absent
+
+- name: idem copy def-proxy.yml to proxy.yml
+  copy:
+    src: inventory/def-proxy.yml
+    dest: inventory/proxy.yml
+
+- name: publicIP writen WinRM
+  replace:
+    dest: inventory/proxy.yml
+    regexp: AABBCC
+    replace: "{{ publicip }}:3128"
+    backup: no
+
+- name: publicIP writen SSH
+  replace:
+    dest: inventory/proxy.yml
+    regexp: ZZXXRR
+    replace: "{{ publicip }}"
+    backup: no
+
+- name: 冪等性維持-RDP1.bat削除
+  file:
+    path: inventory/RDP1.bat
+    state: absent
+
+- name: 冪等性維持-def-rdpコピー
+  copy:
+    src: inventory/def-rdp.bat
+    dest: inventory/RDP1.bat
+
+- name: 取得したパブリックIPをRDP1.batへ書き込み
+  replace:
+    dest: inventory/RDP1.bat
+    regexp: '{{ item.regexp }}'
+    replace: '{{ item.replace }}'
+  with_items:
+    - regexp: AABBCC
+      replace: "{{ publicip }}"
+    - regexp: DDEEFF
+      replace: "{{ lookup('file', 'WIN1.dat') }}"
+    - regexp: RRFFGG
+      replace: 39111
+
+- name: 冪等性維持-RDP2.bat削除
+  file:
+    path: inventory/RDP2.bat
+    state: absent
+
+- name: 冪等性維持-def-rdpコピー
+  copy:
+    src: inventory/def-rdp.bat
+    dest: inventory/RDP2.bat
+
+- name: 取得したパブリックIPをRDP2.batへ書き込み
+  replace:
+    dest: inventory/RDP2.bat
+    regexp: '{{ item.regexp }}'
+    replace: '{{ item.replace }}'
+  with_items:
+      - regexp: AABBCC
+        replace: "{{ publicip }}"
+      - regexp: DDEEFF
+        replace: "{{ lookup('file', 'WIN2.dat') }}"
+      - regexp: RRFFGG
+        replace: 39112
+
+# Guacamole Edge用トンネル
+- name: 冪等性維持-edge.bat削除
+  file:
+    path: inventory/edge.bat
+    state: absent
+
+- name: 冪等性維持-def-edge.batコピー
+  copy:
+    src: inventory/def-edge.bat
+    dest: inventory/edge.bat
+
+- name: publicIP writen edge.bat
+  replace:
+    dest: inventory/edge.bat
+    regexp: AABBCC
+    replace: "{{ publicip }}"
+    backup: no
+
+- name: Ubuntu datファイルカウント処理
+  shell: ls Ubuntu*.dat |wc -l
+  register: return_from_shell_Ubuntu
+
+- name: Linux1 Local IPをhostsへ書き込み
+  replace:
+    dest: inventory/hosts
+    regexp: LNX1
+    replace: "{{ lookup('file', 'Ubuntu{{ item }}.dat') }}"
+    backup: no
+  with_sequence: start=1 end="{{ return_from_shell_Ubuntu.stdout }}"
+
+#For Linux SSH ----------------------------------------------------------
+- name: SSH多段接続用BATファイル生成
+  shell: |
+    sudo tee inventory/SSH1.bat <<EOF
+    REM 踏み台サーバのIPアドレス
+    Set FRONTSV=AABBCC
+    REM 踏み台サーバのID
+    Set FRONT-ID=azureuser
+    REM 踏み台サーバのポート
+    Set FRONT-PORT=22
+    REM 鍵ファイル確認
+    if not exist %userprofile%\Documents\SPEC-SSH-KEYS\spec_id_rsa.pem (
+      xcopy /e /y C:\SPEC-SSH-KEYS\ %userprofile%\Documents\SPEC-SSH-KEYS\\
+    )
+    REM プライベートキーへのフルパス
+    Set KEYPATH=%userprofile%\Documents\SPEC-SSH-KEYS\spec_id_rsa.pem
+    REM フォワード先のIPアドレス
+    Set FWDIP=DDEEFF
+    REM ローカルポート（衝突や重複しないように注意）
+    Set LOCALPORT=RRFFGG
+    REM 接続先
+    Set SERVER=localhost
+    start ssh -L %LOCALPORT%:%FWDIP%:22 %FRONT-ID%@%FRONTSV% -o StrictHostKeyChecking=no -p %FRONT-PORT% -i %KEYPATH%
+    start ssh azureuser@localhost -p %LOCALPORT% -i %KEYPATH% -o StrictHostKeyChecking=no
+    EOF
+- name: 取得したパブリックIPをSSH1.batへ書き込み
+  replace:
+    dest: inventory/SSH1.bat
+    regexp: '{{ item.regexp }}'
+    replace: '{{ item.replace }}'
+  with_items:
+      - regexp: AABBCC
+        replace: "{{ publicip }}"
+      - regexp: DDEEFF
+        replace: "{{ lookup('file', 'Ubuntu1.dat') }}"
+      - regexp: RRFFGG
+        replace: 49111
+- name: SSH多段接続用BATファイルの改行コードを変換
+  shell: |
+    sed -i 's/$/\r/g' inventory/SSH1.bat

@@ -1,0 +1,4 @@
+- name: Squidサービス停止処理
+  service:
+    name: squid
+    state: stopped

@@ -1,0 +1,87 @@
+---
+- hosts: localhost
+  gather_facts: no
+  tasks:
+  roles: # Ansibleはロールを使用する際、自動的に特定のディレクトリ構造を探索します：roles/[role_name]/tasks/main.yml この場合、'rg' ロールと 'vnet' ロールそれぞれに対応する main.yml ファイルを探します
+    - rg # rgという名前のロールが実行されます。
+  tags: rg # このプレイにrgというタグを付けます。これにより、このプレイを選択的に実行できます。
+  
+- hosts: localhost
+  gather_facts: no
+  tasks:
+  roles:
+    - vnet # vnetという名前のロールが実行されます。
+    - subnet
+  tags: vnet # 2つ目のプレイにvnetというタグを付けます。これにより、このプレイも選択的に実行できます。
+
+- hosts: localhost
+  gather_facts: no
+  tasks:
+  roles:
+    - nsg
+  tags: nsg
+
+# Deploy VM&NIC
+- hosts: localhost
+  gather_facts: no
+  vars_files: group_vars/vmgw.yml
+  tasks:
+  roles:
+    - pub_ip
+    - nic
+  tags: nic
+
+- hosts: localhost
+  gather_facts: no
+  vars_files: group_vars/vmgw.yml
+  tasks:
+  roles:
+    - vmdep
+  tags: vmdep
+
+- hosts: localhost
+  gather_facts: no
+  vars_files: group_vars/win1.yml
+  tasks:
+  roles:
+    - nsg-intra
+    - nic
+    - vmdep-win1
+  tags: vmdep-win1
+
+- hosts: localhost
+  gather_facts: no
+  vars_files: group_vars/linux.yml
+  tasks:
+  roles:
+    - nsg-intra
+    - nic
+    - vmdep
+  tags: vmdep-linux1
+
+- hosts: localhost
+  gather_facts: no
+  vars_files: group_vars/linux.yml
+  tasks:
+  roles:
+    - nsg-intra
+    - nic
+    - vmdep
+  tags: vmdep-linux1
+
+- hosts: localhost
+  gather_facts: no
+  vars_files: group_vars/win2.yml
+  tasks:
+  roles:
+    - nsg-intra
+    - nic
+    - vmdep-win1
+  tags: vmdep-win2
+
+- hosts: localhost
+  gather_facts: no
+  tasks:
+  roles:
+    - ipset
+  tags: ipset

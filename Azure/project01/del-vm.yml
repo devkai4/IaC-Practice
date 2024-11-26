@@ -1,0 +1,19 @@
+---
+- hosts: localhost
+  gather_facts: no
+  tasks:
+  - name: Delete VM "{{ myVM }}"
+    azure_rm_virtualmachine:
+      resource_group: "{{ myResourceGroup }}"
+      name: "{{ myVM }}"
+      state: absent
+ 
+  - name: Delete Network Security Group "{{ myVM }}-SecurityGroup"
+    azure_rm_securitygroup:
+      resource_group: "{{ myResourceGroup }}"
+      name: "{{ myVM }}-SecurityGroup"
+      state: absent
+ 
+  tags:
+    - never
+    - delete

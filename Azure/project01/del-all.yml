@@ -1,0 +1,13 @@
+---
+- hosts: localhost
+  gather_facts: no
+  tasks:
+  - name: Delete resource group
+    azure_rm_resourcegroup:
+      name: "{{ myResourceGroup }}"
+      location: "{{ area }}"
+      state: absent 
+      force_delete_nonempty: true
+  tags:
+    - never
+    - delete

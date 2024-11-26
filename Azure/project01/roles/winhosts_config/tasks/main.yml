@@ -1,0 +1,18 @@
+- name: Set timezone to 'Tokyo Standard Time'
+  win_timezone:
+    timezone: Tokyo Standard Time
+
+- name: Themes disabled
+  win_service:
+    name: Themes
+    start_mode: disabled
+
+- name: Firewall rule to allow ICMP v4 (ping)
+  win_firewall_rule:
+    name: ICMP Allow incoming V4 echo request
+    enabled: yes
+    state: present
+    profiles: domain,private,public
+    action: allow
+    direction: in
+    protocol: icmpv4

@@ -1,0 +1,32 @@
+---
+# Resource Group
+myResourceGroup: zhengkai.wang
+
+# Region
+area: japaneast
+
+# Name of VNET
+myVnet: KAI-VNET-01
+
+# VNET address space
+vnetpref: 10.100.0.0/21
+
+# Subnet Definition of DMZ
+mySubnet1: DMZ-Subnet
+subnetpref1: 10.100.0.0/24
+
+# Subnet Definition of Trust
+mySubnet2: Trust-Subnet
+subnetpref2: 10.100.1.0/24
+
+#Bastion Subnet
+var_bastion_subnet: AzureBastionSubnet
+var_bastion_pref: 10.100.7.0/26
+#Bastion Name
+var_bastion_name: "{{ myResourceGroup }}-Bastion"
+
+# NSG for VMGW
+pub_nsg: VMGW_NSG
+
+# SPEC Public key
+pubkey: ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDKdrWwjqfJf2R2P+egrq5Qohsvp5URdC2tDgcR9yw3iDqhvTlauxhlyZfISK0CVoP5Q0KR2Z55kRC7zlfg9jitXc25rVbQ7rB23DcsRHBqREo0RrRDUOFwPXNjoOz+y3WNfZstrmyJc2iXWMKVeY6sM7oTkVJ/xgu4I4io2u/msBnyEDo2PYXDWXUuUL1UoMnhXKyjBNfqm9GMjU0xGHI97tZTlk45smC3cD8fiLiurBTAgEAQi1jpp44zp09D0N/rXgUZJhTOD/Hif1GUCXW4hooO83EkVGrmckGXjFJxihIz1YCGtmDwbM2JBl+B+fTbhS6TbZYH+LGbVBsptgNz SPEC SYSTEM RHEL8 KEY

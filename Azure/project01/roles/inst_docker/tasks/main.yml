@@ -1,0 +1,68 @@
+- name: dpkg cache clear
+  ansible.builtin.shell:
+    cmd: >
+      rm -rf /var/lib/dpkg/lock-frontend
+
+- name: Install APT packages to use a repository over HTTPS
+  ansible.builtin.apt:
+    pkg:
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+    update_cache: yes
+    cache_valid_time: 86400 # cache for 1 day
+
+- name: Create APT's keyrings directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+
+- name: Add Docker's official GPG key
+  ansible.builtin.shell:
+    cmd: curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    creates: /etc/apt/keyrings/docker.gpg
+
+- name: Setup the repository
+  ansible.builtin.shell:
+    cmd: >
+      echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+      | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+    creates: /etc/apt/sources.list.d/docker.list
+
+- name: Install Docker
+  ansible.builtin.apt:
+    pkg:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-compose-plugin
+      - docker-compose
+    update_cache: yes
+
+- name: Start Docker
+  ansible.builtin.service:
+    name: docker
+    state: started
+
+- name: ansible実行ユーザをdockerグループへ追加
+  user:
+    name: azureuser
+    state: present
+    groups:
+      - docker
+    append: yes
+  register: ansible_group
+
+- name: ansible実行ユーザのグループ有効化
+  when: ansible_group is changed
+  block:
+    - name: sshdの再起動
+      systemd:
+        name: sshd
+        state: restarted
+
+- name: sshd再起動待機
+  wait_for_connection:
+    delay: 1
+    timeout: 100

@@ -1,0 +1,15 @@
+---
+- name: Create public IP address
+  azure_rm_publicipaddress:
+    resource_group: "{{ myResourceGroup }}"
+    allocation_method: Static
+    name: "{{ myVM }}-publicIP"
+  register: output_ip_address
+
+- name: Public IP of VM
+  debug:
+    msg: "The public IP is {{ output_ip_address.state.ip_address }}."
+
+- name: Public IP of VM set env
+  set_fact:
+    publicip: "{{ output_ip_address.state.ip_address }}"
