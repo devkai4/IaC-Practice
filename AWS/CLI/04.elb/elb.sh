@@ -3,52 +3,57 @@ set -euo pipefail
 
 # Variables
 PREFIX="cloud01"
+MY_DOMAIN="cloud01.work"
+PUBLIC_SUBNET_1a_ID=$(aws ec2 describe-subnets --filters Name=tag:Name,Values=${PREFIX}-public-subnet-1a --query "Subnets[*].SubnetId" --output text) && echo $PUBLIC_SUBNET_1a_ID
+PUBLIC_SUBNET_1c_ID=$(aws ec2 describe-subnets --filters Name=tag:Name,Values=${PREFIX}-public-subnet-1c --query "Subnets[*].SubnetId" --output text) && echo $PUBLIC_SUBNET_1c_ID
+ELB_SECURITY_GROUP_ID=$(aws ec2 describe-security-groups --filters Name=tag:Name,Values=${PREFIX}-elb-sg --query "SecurityGroups[*].GroupId" --output text) && echo $ELB_SECURITY_GROUP_ID
+VPC_ID=$(aws ec2 describe-vpcs --filters Name=tag:Name,Values=${PREFIX}-vpc --query "Vpcs[*].VpcId" --output text) && echo $VPC_ID
+CERTIFICATE_ARN=$(aws acm list-certificates --query "CertificateSummaryList[?DomainName==\`*.$MY_DOMAIN\`].CertificateArn" --output text) && echo $CERTIFICATE_ARN
 
-# Get subnet IDs for ALB (need 2 public subnets)
-PUBLIC_SUBNET_1=$(aws ec2 describe-subnets \
-  --filters Name=tag:Name,Values=${PREFIX}-public-subnet-1a \
-  --query "Subnets[*].SubnetId" --output text)
-  
-PUBLIC_SUBNET_2=$(aws ec2 describe-subnets \
-  --filters Name=tag:Name,Values=${PREFIX}-public-subnet-1c \
-  --query "Subnets[*].SubnetId" --output text)
-
-# Get security group ID
-ELB_SECURITY_GROUP_ID=$(aws ec2 describe-security-groups \
-  --filters Name=tag:Name,Values=${PREFIX}-elb-sg \
-  --query "SecurityGroups[*].GroupId" --output text)
-
-# Create target group
-TARGET_GROUP_ARN=$(aws elbv2 create-target-group \
-  --name ${PREFIX}-tg \
-  --protocol HTTP \
-  --port 80 \
-  --vpc-id $VPC_ID \
-  --target-type instance \
-  --health-check-path / \
-  --tags Key=Name,Value=${PREFIX}-tg \
-  --query 'TargetGroups[0].TargetGroupArn' --output text)
-
-# Create ALB
-ALB_ARN=$(aws elbv2 create-load-balancer \
-  --name ${PREFIX}-alb \
-  --subnets $PUBLIC_SUBNET_1 $PUBLIC_SUBNET_2 \
+# ELB
+LOAD_BALANCER_ARN=$(aws elbv2 create-load-balancer \
+  --name ${PREFIX}-alb  \
+  --subnets $PUBLIC_SUBNET_1a_ID $PUBLIC_SUBNET_1c_ID \
   --security-groups $ELB_SECURITY_GROUP_ID \
-  --tags Key=Name,Value=${PREFIX}-alb \
-  --query 'LoadBalancers[0].LoadBalancerArn' --output text)
+  --type application \
+  --scheme internet-facing \
+  --query "LoadBalancers[*].LoadBalancerArn" --output text) && echo $LOAD_BALANCER_ARN
 
-# Create listener
-aws elbv2 create-listener \
-  --load-balancer-arn $ALB_ARN \
+# TargetGroup
+TARGET_GROUP_ARN=$(aws elbv2 create-target-group \
+  --name ${PREFIX}-alb-tg \
+  --target-type ip \
   --protocol HTTP \
   --port 80 \
-  --default-actions Type=forward,TargetGroupArn=$TARGET_GROUP_ARN
+  --protocol-version HTTP1 \
+  --vpc-id $VPC_ID \
+  --health-check-protocol HTTP \
+  --health-check-path / \
+  --health-check-port traffic-port \
+  --healthy-threshold-count 5 \
+  --unhealthy-threshold-count 2 \
+  --health-check-timeout-seconds 5 \
+  --health-check-interval-seconds 30 \
+  --matcher HttpCode=200 \
+  --query "TargetGroups[*].TargetGroupArn" --output text) && echo $TARGET_GROUP_ARN
 
-# Register EC2 instance to target group
-INSTANCE_ID=$(aws ec2 describe-instances \
-  --filters Name=tag:Name,Values=${PREFIX}-web-01 \
-  --query 'Reservations[0].Instances[0].InstanceId' --output text)
-
+# Regster targets
 aws elbv2 register-targets \
   --target-group-arn $TARGET_GROUP_ARN \
-  --targets Id=$INSTANCE_ID
+  --targets Id=10.0.11.11 Id=10.0.12.11
+
+## Listener
+# HTTP
+aws elbv2 create-listener \
+  --load-balancer-arn $LOAD_BALANCER_ARN \
+  --protocol HTTP \
+  --port 80  \
+  --default-actions 'Type=redirect,RedirectConfig={Protocol=HTTPS,Port=443,Host="#{host}",Path="/#{path}",Query="#{query}",StatusCode=HTTP_301}'
+
+# HTTPS
+aws elbv2 create-listener \
+  --load-balancer-arn $LOAD_BALANCER_ARN \
+  --protocol HTTPS \
+  --port 443  \
+  --certificates CertificateArn=$CERTIFICATE_ARN \
+  --default-actions Type=forward,TargetGroupArn=$TARGET_GROUP_ARN
