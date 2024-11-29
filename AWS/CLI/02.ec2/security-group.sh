@@ -44,12 +44,14 @@ EC2_SECURITY_GROUP_ID=$(aws ec2 create-security-group \
 
 # Systems Manager Session Managerを使用する場合はSSHルールは不要
 # 従来のSSH接続が必要な場合は、会社の固定IPやVPN出口IPを指定
-# echo "Adding ingress rule for SSH (port 22) from allowed IP ranges..."
-# aws ec2 authorize-security-group-ingress \
-# --group-id $EC2_SECURITY_GROUP_ID \
-# --protocol tcp \
-# --port 22 \
-# --cidr 10.0.0.0/8  # 例：社内ネットワークのCIDR
+echo "Adding ingress rule for SSH (port 22) from allowed IP ranges..."
+aws ec2 authorize-security-group-ingress \
+--group-id $EC2_SECURITY_GROUP_ID \
+--protocol tcp \
+--port 22 \
+--cidr 0.0.0.0./0 # 危険
+# 例：社内ネットワークのCIDR
+# --cidr 10.0.0.0/8  
 
 echo "Adding ingress rule for HTTP (port 80) from ELB Security Group..."
 aws ec2 authorize-security-group-ingress \
